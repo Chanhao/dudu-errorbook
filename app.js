@@ -278,8 +278,8 @@ function loadGitHubSettings() {
     settings = {};
   }
   if (!els.githubOwner) return;
-  els.githubOwner.value = settings.owner || "";
-  els.githubRepo.value = settings.repo || "";
+  els.githubOwner.value = settings.owner || "Chanhao";
+  els.githubRepo.value = settings.repo || "dudu-errorbook-data";
   els.githubBranch.value = settings.branch || "main";
   els.githubPath.value = settings.path || "data/entries.json";
   els.githubToken.value = settings.token || "";
