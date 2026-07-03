@@ -3,6 +3,38 @@ const SETTINGS_KEY = "dudu-errorbook:settings";
 const GITHUB_SYNC_KEY = "dudu-errorbook:github-sync";
 const REVIEW_INTERVALS = [0, 1, 2, 4, 7, 14, 30, 60];
 const SERVER_SYNC = location.protocol === "http:" || location.protocol === "https:";
+const AI_PROVIDERS = {
+  openai: {
+    label: "OpenAI / GPT",
+    baseUrl: "https://api.openai.com/v1",
+    model: "gpt-4o-mini",
+    hint: "使用 OpenAI Chat Completions；适合 GPT 系列模型。",
+  },
+  gemini: {
+    label: "Google Gemini",
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
+    model: "gemini-3.5-flash",
+    hint: "使用 Gemini 的 OpenAI-compatible endpoint；API Key 来自 Google AI Studio。",
+  },
+  kimi: {
+    label: "Kimi / Moonshot",
+    baseUrl: "https://api.moonshot.ai/v1",
+    model: "kimi-k2.6",
+    hint: "使用 Kimi Open Platform；Kimi K2 系列建议温度 0.6。",
+  },
+  deepseek: {
+    label: "DeepSeek",
+    baseUrl: "https://api.deepseek.com",
+    model: "deepseek-v4-flash",
+    hint: "使用 DeepSeek OpenAI-compatible endpoint；也可改用 deepseek-v4-pro。",
+  },
+  custom: {
+    label: "自定义 OpenAI-compatible",
+    baseUrl: "",
+    model: "",
+    hint: "用于 OpenRouter、硅基流动、火山方舟等兼容 Chat Completions 的服务。",
+  },
+};
 
 const state = {
   entries: [],
@@ -43,11 +75,13 @@ const els = {
   typeFilter: $("#typeFilter"),
   summaryOutput: $("#summaryOutput"),
   generateOutput: $("#generateOutput"),
+  apiProvider: $("#apiProvider"),
   apiBaseUrl: $("#apiBaseUrl"),
   apiKey: $("#apiKey"),
   apiModel: $("#apiModel"),
   apiTemperature: $("#apiTemperature"),
   apiFormat: $("#apiFormat"),
+  apiProviderHint: $("#apiProviderHint"),
   githubOwner: $("#githubOwner"),
   githubRepo: $("#githubRepo"),
   githubBranch: $("#githubBranch"),
@@ -247,15 +281,19 @@ function loadSettings() {
   } catch {
     settings = {};
   }
-  els.apiBaseUrl.value = settings.baseUrl || "https://api.openai.com/v1";
+  const provider = settings.provider || inferProvider(settings.baseUrl);
+  els.apiProvider.value = provider;
+  els.apiBaseUrl.value = settings.baseUrl || AI_PROVIDERS[provider]?.baseUrl || AI_PROVIDERS.openai.baseUrl;
   els.apiKey.value = settings.apiKey || "";
-  els.apiModel.value = settings.model || "";
+  els.apiModel.value = settings.model || AI_PROVIDERS[provider]?.model || "";
   els.apiTemperature.value = settings.temperature ?? "0.4";
   els.apiFormat.value = settings.format || "openai";
+  updateProviderHint();
 }
 
 function getSettings() {
   return {
+    provider: els.apiProvider.value,
     baseUrl: els.apiBaseUrl.value.trim().replace(/\/+$/, ""),
     apiKey: els.apiKey.value.trim(),
     model: els.apiModel.value.trim(),
@@ -268,6 +306,30 @@ function saveSettings() {
   const settings = getSettings();
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
   toast("AI 设置已保存");
+}
+
+function inferProvider(baseUrl = "") {
+  const url = String(baseUrl || "");
+  if (url.includes("generativelanguage.googleapis.com")) return "gemini";
+  if (url.includes("moonshot.ai") || url.includes("moonshot.cn")) return "kimi";
+  if (url.includes("deepseek.com")) return "deepseek";
+  if (url.includes("openai.com")) return "openai";
+  return "openai";
+}
+
+function updateProviderHint() {
+  const provider = AI_PROVIDERS[els.apiProvider.value] || AI_PROVIDERS.custom;
+  els.apiProviderHint.textContent = provider.hint;
+}
+
+function applyProviderPreset({ force = false } = {}) {
+  const provider = AI_PROVIDERS[els.apiProvider.value] || AI_PROVIDERS.custom;
+  if (provider.baseUrl && (force || !els.apiBaseUrl.value.trim())) els.apiBaseUrl.value = provider.baseUrl;
+  if (provider.model && (force || !els.apiModel.value.trim())) els.apiModel.value = provider.model;
+  if (els.apiProvider.value === "kimi" && (force || !els.apiTemperature.value || Number(els.apiTemperature.value) < 0.1)) {
+    els.apiTemperature.value = "0.6";
+  }
+  updateProviderHint();
 }
 
 function loadGitHubSettings() {
@@ -747,6 +809,19 @@ function entriesForRemote(entries) {
   return entries.map(({ resolvedImageDataUrl, ...entry }) => entry);
 }
 
+function chatCompletionsUrl(settings) {
+  const baseUrl = settings.baseUrl.replace(/\/+$/, "");
+  return `${baseUrl}/chat/completions`;
+}
+
+function normalizeAiBody(settings, body) {
+  if (settings.provider === "kimi" && /^kimi-k2\./i.test(settings.model)) {
+    const temp = Number(body.temperature);
+    body.temperature = temp >= 0.9 ? 1 : 0.6;
+  }
+  return body;
+}
+
 async function callAi(messages, { json = false } = {}) {
   const settings = getSettings();
   if (!settings.baseUrl || !settings.apiKey || !settings.model) {
@@ -760,7 +835,8 @@ async function callAi(messages, { json = false } = {}) {
   if (json) {
     body.response_format = { type: "json_object" };
   }
-  const response = await fetch(`${settings.baseUrl}/chat/completions`, {
+  normalizeAiBody(settings, body);
+  const response = await fetch(chatCompletionsUrl(settings), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -1019,6 +1095,7 @@ function bindEvents() {
   $("#aiClassifyBtn").addEventListener("click", aiClassifyCurrent);
   $("#aiSummaryBtn").addEventListener("click", aiSummary);
   $("#generateBtn").addEventListener("click", generatePractice);
+  els.apiProvider.addEventListener("change", () => applyProviderPreset({ force: true }));
   $("#saveSettingsBtn").addEventListener("click", saveSettings);
   $("#testApiBtn").addEventListener("click", testApi);
   $("#saveGitHubBtn").addEventListener("click", saveGitHubSettings);

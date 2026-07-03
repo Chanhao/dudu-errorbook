@@ -6,9 +6,9 @@
     <meta name="theme-color" content="#f8fafc" />
     <title>嘟嘟错题本</title>
     <link rel="manifest" href="./manifest.json" />
-    <link rel="stylesheet" href="./styles.css?v=4" />
+    <link rel="stylesheet" href="./styles.css?v=6" />
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
-    <script src="./app.js?v=4" defer></script>
+    <script src="./app.js?v=6" defer></script>
   </head>
   <body>
     <div class="app-shell">
@@ -297,16 +297,26 @@
             <div class="panel">
               <h3>AI API 配置</h3>
               <label class="field">
+                <span>服务商</span>
+                <select id="apiProvider">
+                  <option value="openai">OpenAI / GPT</option>
+                  <option value="gemini">Google Gemini</option>
+                  <option value="kimi">Kimi / Moonshot</option>
+                  <option value="deepseek">DeepSeek</option>
+                  <option value="custom">自定义 OpenAI-compatible</option>
+                </select>
+              </label>
+              <label class="field">
                 <span>Base URL</span>
                 <input id="apiBaseUrl" placeholder="https://api.openai.com/v1" />
               </label>
               <label class="field">
                 <span>API Key</span>
-                <input id="apiKey" type="password" placeholder="sk-..." autocomplete="off" />
+                <input id="apiKey" type="password" placeholder="sk-... / Gemini API Key" autocomplete="off" />
               </label>
               <label class="field">
                 <span>模型名</span>
-                <input id="apiModel" placeholder="例如：gpt-4o-mini / deepseek-chat / doubao-..." />
+                <input id="apiModel" placeholder="例如：gpt-4o-mini / gemini-3.5-flash / kimi-k2.6 / deepseek-v4-flash" />
               </label>
               <div class="field-grid two">
                 <label class="field">
@@ -320,6 +330,7 @@
                   </select>
                 </label>
               </div>
+              <p class="hint" id="apiProviderHint">选择服务商后会自动填入 Base URL 和推荐模型；API Key 只保存在当前浏览器。</p>
               <div class="form-actions">
                 <button class="primary-button" id="saveSettingsBtn" type="button">
                   <i data-lucide="save"></i><span>保存设置</span>
