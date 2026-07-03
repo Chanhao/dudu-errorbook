@@ -545,6 +545,65 @@ textarea:focus {
   font-weight: 700;
 }
 
+.practice-picker {
+  display: grid;
+  gap: 10px;
+  margin: 4px 0 12px;
+}
+
+.practice-picker-top {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.practice-picker-list {
+  display: grid;
+  gap: 8px;
+  max-height: 320px;
+  overflow: auto;
+  padding: 2px;
+}
+
+.practice-picker-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+}
+
+.practice-picker-item.selected {
+  border-color: #9bc7ff;
+  background: var(--accent-soft);
+}
+
+.practice-picker-item input {
+  width: 20px;
+  min-height: 20px;
+  margin-top: 2px;
+  accent-color: var(--accent);
+}
+
+.practice-picker-item strong,
+.practice-picker-item small {
+  display: block;
+}
+
+.practice-picker-item strong {
+  line-height: 1.35;
+  font-size: 14px;
+}
+
+.practice-picker-item small {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .search-box {
   display: flex;
   align-items: center;

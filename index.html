@@ -6,9 +6,9 @@
     <meta name="theme-color" content="#f8fafc" />
     <title>嘟嘟错题本</title>
     <link rel="manifest" href="./manifest.json" />
-    <link rel="stylesheet" href="./styles.css?v=8" />
+    <link rel="stylesheet" href="./styles.css?v=9" />
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
-    <script src="./app.js?v=8" defer></script>
+    <script src="./app.js?v=9" defer></script>
   </head>
   <body>
     <div class="app-shell">
@@ -47,6 +47,9 @@
             <p class="sync-status" id="syncStatus">同步服务连接中</p>
           </div>
           <div class="top-actions">
+            <button class="icon-button" id="refreshAppBtn" type="button" title="刷新">
+              <i data-lucide="refresh-cw"></i>
+            </button>
             <a class="icon-button" href="./quick.html" title="快速录入">
               <i data-lucide="bolt"></i>
             </a>
@@ -239,10 +242,20 @@
                 <span>出题依据</span>
                 <select id="genSource">
                   <option value="filtered">按学科和时间范围</option>
-                  <option value="selected">仅使用错题库里勾选的错题</option>
+                  <option value="selected">选择某一道或几道错题</option>
                 </select>
               </label>
-              <p class="hint" id="genSelectionHint">需要针对某一条错题出题时，先到“错题库”勾选它，再回到这里生成。</p>
+              <p class="hint" id="genSelectionHint">选择“某一道或几道错题”后，可在下面直接勾选要针对练习的错题。</p>
+              <div class="practice-picker" id="practicePicker" hidden>
+                <div class="practice-picker-top">
+                  <div class="search-box">
+                    <i data-lucide="search"></i>
+                    <input id="practiceSearchInput" placeholder="搜索要出题的错题" />
+                  </div>
+                  <button class="mini-button" id="clearGeneratePracticeSelectionBtn" type="button">清除</button>
+                </div>
+                <div class="practice-picker-list" id="practicePickerList"></div>
+              </div>
               <div class="field-grid two">
                 <label class="field">
                   <span>学科范围</span>

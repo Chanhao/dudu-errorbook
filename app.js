@@ -67,6 +67,7 @@ const els = {
   imageInput: $("#imageInput"),
   imagePreview: $("#imagePreview"),
   previewImg: $("#previewImg"),
+  refreshAppBtn: $("#refreshAppBtn"),
   recentList: $("#recentList"),
   libraryList: $("#libraryList"),
   reviewQueue: $("#reviewQueue"),
@@ -80,6 +81,10 @@ const els = {
   generateOutput: $("#generateOutput"),
   genSource: $("#genSource"),
   genSelectionHint: $("#genSelectionHint"),
+  practicePicker: $("#practicePicker"),
+  practicePickerList: $("#practicePickerList"),
+  practiceSearchInput: $("#practiceSearchInput"),
+  clearGeneratePracticeSelectionBtn: $("#clearGeneratePracticeSelectionBtn"),
   apiProvider: $("#apiProvider"),
   apiBaseUrl: $("#apiBaseUrl"),
   apiKey: $("#apiKey"),
@@ -143,6 +148,25 @@ function loadEntries() {
 function saveEntries() {
   localStorage.setItem(STORE_KEY, JSON.stringify(state.entries));
   render();
+}
+
+async function forceRefreshApp() {
+  toast("正在刷新页面...");
+  try {
+    if ("serviceWorker" in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map((registration) => registration.update()));
+    }
+    if ("caches" in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.filter((key) => key.startsWith("dudu-errorbook-")).map((key) => caches.delete(key)));
+    }
+  } catch {
+    // Continue with a URL refresh even if cache APIs are blocked.
+  }
+  const url = new URL(window.location.href);
+  url.searchParams.set("refresh", Date.now().toString());
+  window.location.replace(url.toString());
 }
 
 function setSyncStatus(text) {
@@ -741,9 +765,43 @@ function updatePracticeSelectionUI() {
   if (els.selectedPracticeCount) els.selectedPracticeCount.textContent = `已勾选 ${count} 条`;
   if (els.genSelectionHint) {
     els.genSelectionHint.textContent = count
-      ? `当前已勾选 ${count} 条错题。选择“仅使用错题库里勾选的错题”即可针对它们出题。`
-      : "需要针对某一条错题出题时，先到“错题库”勾选它，再回到这里生成。";
+      ? `当前已选择 ${count} 条错题。生成时会只围绕这些错题出题。`
+      : "选择“某一道或几道错题”后，可在下面直接勾选要针对练习的错题。";
   }
+  renderPracticePicker();
+}
+
+function entrySearchText(entry) {
+  return [entry.subject, entry.errorType, entry.source, entry.wrongText, entry.correctText, entry.reason, ...(entry.tags || [])]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+function renderPracticePicker() {
+  if (!els.practicePicker || !els.practicePickerList) return;
+  const active = els.genSource?.value === "selected";
+  els.practicePicker.hidden = !active;
+  if (!active) return;
+  const q = els.practiceSearchInput.value.trim().toLowerCase();
+  const entries = state.entries.filter((entry) => !q || entrySearchText(entry).includes(q)).slice(0, 100);
+  els.practicePickerList.innerHTML = entries.length
+    ? entries
+        .map((entry) => {
+          const title = escapeHtml(entry.wrongText || entry.correctText || "图片记录");
+          const meta = escapeHtml(`${entry.date || ""} · ${entry.subject || ""} · ${entry.errorType || ""}`);
+          return `
+            <label class="practice-picker-item ${state.practiceSelection.has(entry.id) ? "selected" : ""}">
+              <input class="practice-select" type="checkbox" data-id="${escapeHtml(entry.id)}" ${state.practiceSelection.has(entry.id) ? "checked" : ""} />
+              <span>
+                <strong>${title}</strong>
+                <small>${meta}</small>
+              </span>
+            </label>
+          `;
+        })
+        .join("")
+    : `<div class="empty">没有找到可选择的错题。</div>`;
 }
 
 function renderReview() {
@@ -1002,7 +1060,7 @@ async function generatePractice() {
       ? state.entries.filter((entry) => state.practiceSelection.has(entry.id)).slice(0, 30)
       : state.entries.filter((entry) => (!subject || entry.subject === subject) && (!since || entry.date >= since)).slice(0, 80);
   if (!entries.length) {
-    toast(sourceMode === "selected" ? "请先在错题库勾选要出题的错题" : "当前范围没有错题记录");
+    toast(sourceMode === "selected" ? "请先在下方选择要出题的错题" : "当前范围没有错题记录");
     return;
   }
   const count = Number($("#genCount").value || 10);
@@ -1010,7 +1068,7 @@ async function generatePractice() {
   const extra = $("#genExtra").value.trim();
   const scopeText =
     sourceMode === "selected"
-      ? `已勾选的 ${entries.length} 条错题${entries.length === 1 ? "，请重点围绕这一条做同类变式和小测" : ""}`
+      ? `已选择的 ${entries.length} 条错题${entries.length === 1 ? "，请重点围绕这一条做同类变式和小测" : ""}`
       : `${subject || "全部学科"}，${range > 0 ? `最近 ${range} 天` : "全部记录"}`;
   els.generateOutput.textContent = "正在生成练习...";
   try {
@@ -1119,6 +1177,7 @@ function addSampleData() {
 function bindEvents() {
   $$(".nav-tab").forEach((btn) => btn.addEventListener("click", () => setView(btn.dataset.view)));
   $$("#subjectGroup button").forEach((btn) => btn.addEventListener("click", () => updateSubject(btn.dataset.value)));
+  els.refreshAppBtn.addEventListener("click", forceRefreshApp);
   els.entryForm.addEventListener("submit", saveFormEntry);
   $("#clearFormBtn").addEventListener("click", () => clearForm());
   $("#copyLastSourceBtn").addEventListener("click", () => {
@@ -1145,10 +1204,18 @@ function bindEvents() {
   $("#aiClassifyBtn").addEventListener("click", aiClassifyCurrent);
   $("#aiSummaryBtn").addEventListener("click", aiSummary);
   $("#generateBtn").addEventListener("click", generatePractice);
-  els.genSource.addEventListener("change", updatePracticeSelectionUI);
+  els.genSource.addEventListener("change", () => {
+    updatePracticeSelectionUI();
+    renderPracticePicker();
+  });
+  els.practiceSearchInput.addEventListener("input", renderPracticePicker);
   els.clearPracticeSelectionBtn.addEventListener("click", () => {
     state.practiceSelection.clear();
     renderLibrary();
+    updatePracticeSelectionUI();
+  });
+  els.clearGeneratePracticeSelectionBtn.addEventListener("click", () => {
+    state.practiceSelection.clear();
     updatePracticeSelectionUI();
   });
   els.apiProvider.addEventListener("change", () => applyProviderPreset({ force: true }));
