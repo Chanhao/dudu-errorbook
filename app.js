@@ -42,6 +42,7 @@ const state = {
   imageDataUrl: "",
   githubSha: "",
   view: "capture",
+  practiceSelection: new Set(),
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -73,8 +74,12 @@ const els = {
   searchInput: $("#searchInput"),
   subjectFilter: $("#subjectFilter"),
   typeFilter: $("#typeFilter"),
+  selectedPracticeCount: $("#selectedPracticeCount"),
+  clearPracticeSelectionBtn: $("#clearPracticeSelectionBtn"),
   summaryOutput: $("#summaryOutput"),
   generateOutput: $("#generateOutput"),
+  genSource: $("#genSource"),
+  genSelectionHint: $("#genSelectionHint"),
   apiProvider: $("#apiProvider"),
   apiBaseUrl: $("#apiBaseUrl"),
   apiKey: $("#apiKey"),
@@ -613,6 +618,7 @@ function deleteEntry(id) {
   if (!entry) return;
   if (!window.confirm("确认删除这条记录？")) return;
   state.entries = state.entries.filter((item) => item.id !== id);
+  state.practiceSelection.delete(id);
   saveEntries();
   backgroundSync(syncDeleteEntry(id));
   toast("记录已删除");
@@ -677,6 +683,13 @@ function renderStats() {
 
 function entryCard(entry, compact = false) {
   const text = escapeHtml(entry.wrongText || entry.correctText || "图片记录");
+  const selected = state.practiceSelection.has(entry.id);
+  const selector = compact
+    ? ""
+    : `<label class="practice-select-label" title="勾选后可在 AI 出题中只针对这条错题生成练习">
+        <input class="practice-select" type="checkbox" data-id="${escapeHtml(entry.id)}" ${selected ? "checked" : ""} />
+        <span>出题</span>
+      </label>`;
   const tags = [entry.subject, entry.errorType, ...(entry.tags || [])]
     .filter(Boolean)
     .map((tag, index) => `<span class="tag ${index === 0 ? "subject-chip" : ""}">${escapeHtml(tag)}</span>`)
@@ -690,6 +703,7 @@ function entryCard(entry, compact = false) {
           <h4 class="entry-title">${text}</h4>
           <div class="meta">${escapeHtml(entry.date || "")} · ${escapeHtml(entry.source || "未填写来源")} · 下次复习 ${escapeHtml(entry.nextReviewDate || entry.date || today())}</div>
         </div>
+        ${selector}
       </header>
       ${image}
       ${entry.correctText ? `<div><strong>正确：</strong>${escapeHtml(entry.correctText)}</div>` : ""}
@@ -717,6 +731,19 @@ function renderLibrary() {
   els.libraryList.innerHTML = entries.length
     ? entries.map((entry) => entryCard(entry)).join("")
     : `<div class="empty">没有找到符合条件的记录。</div>`;
+  updatePracticeSelectionUI();
+}
+
+function updatePracticeSelectionUI() {
+  const validIds = new Set(state.entries.map((entry) => entry.id));
+  state.practiceSelection = new Set([...state.practiceSelection].filter((id) => validIds.has(id)));
+  const count = state.practiceSelection.size;
+  if (els.selectedPracticeCount) els.selectedPracticeCount.textContent = `已勾选 ${count} 条`;
+  if (els.genSelectionHint) {
+    els.genSelectionHint.textContent = count
+      ? `当前已勾选 ${count} 条错题。选择“仅使用错题库里勾选的错题”即可针对它们出题。`
+      : "需要针对某一条错题出题时，先到“错题库”勾选它，再回到这里生成。";
+  }
 }
 
 function renderReview() {
@@ -777,6 +804,7 @@ function render() {
   renderRecent();
   if (state.view === "library") renderLibrary();
   if (state.view === "review") renderReview();
+  updatePracticeSelectionUI();
 }
 
 function escapeHtml(value) {
@@ -968,16 +996,22 @@ async function generatePractice() {
   const subject = $("#genSubject").value;
   const range = Number($("#genRange").value);
   const since = range > 0 ? daysAgo(range) : "";
-  const entries = state.entries
-    .filter((entry) => (!subject || entry.subject === subject) && (!since || entry.date >= since))
-    .slice(0, 80);
+  const sourceMode = els.genSource.value;
+  const entries =
+    sourceMode === "selected"
+      ? state.entries.filter((entry) => state.practiceSelection.has(entry.id)).slice(0, 30)
+      : state.entries.filter((entry) => (!subject || entry.subject === subject) && (!since || entry.date >= since)).slice(0, 80);
   if (!entries.length) {
-    toast("当前范围没有错题记录");
+    toast(sourceMode === "selected" ? "请先在错题库勾选要出题的错题" : "当前范围没有错题记录");
     return;
   }
   const count = Number($("#genCount").value || 10);
   const mode = $("#genMode").value;
   const extra = $("#genExtra").value.trim();
+  const scopeText =
+    sourceMode === "selected"
+      ? `已勾选的 ${entries.length} 条错题${entries.length === 1 ? "，请重点围绕这一条做同类变式和小测" : ""}`
+      : `${subject || "全部学科"}，${range > 0 ? `最近 ${range} 天` : "全部记录"}`;
   els.generateOutput.textContent = "正在生成练习...";
   try {
     const result = await callAi([
@@ -988,7 +1022,7 @@ async function generatePractice() {
       },
       {
         role: "user",
-        content: `请根据以下错题记录生成${count}题「${mode}」。范围：${subject || "全部学科"}。额外要求：${extra || "无"}。\n错题记录：\n${JSON.stringify(compactEntries(entries), null, 2)}`,
+        content: `请根据以下错题记录生成${count}题「${mode}」。出题依据：${scopeText}。额外要求：${extra || "无"}。\n错题记录：\n${JSON.stringify(compactEntries(entries), null, 2)}`,
       },
     ]);
     els.generateOutput.textContent = result;
@@ -1111,6 +1145,12 @@ function bindEvents() {
   $("#aiClassifyBtn").addEventListener("click", aiClassifyCurrent);
   $("#aiSummaryBtn").addEventListener("click", aiSummary);
   $("#generateBtn").addEventListener("click", generatePractice);
+  els.genSource.addEventListener("change", updatePracticeSelectionUI);
+  els.clearPracticeSelectionBtn.addEventListener("click", () => {
+    state.practiceSelection.clear();
+    renderLibrary();
+    updatePracticeSelectionUI();
+  });
   els.apiProvider.addEventListener("change", () => applyProviderPreset({ force: true }));
   $("#saveSettingsBtn").addEventListener("click", saveSettings);
   $("#testApiBtn").addEventListener("click", testApi);
@@ -1134,6 +1174,7 @@ function bindEvents() {
   $("#printOutputBtn").addEventListener("click", () => window.print());
   [els.searchInput, els.subjectFilter, els.typeFilter].forEach((el) => el.addEventListener("input", renderLibrary));
   document.body.addEventListener("click", handleDelegatedClick);
+  document.body.addEventListener("change", handleDelegatedChange);
 }
 
 function handleDelegatedClick(event) {
@@ -1146,6 +1187,16 @@ function handleDelegatedClick(event) {
   if (action === "review-ok") reviewEntry(id, 3);
   if (action === "review-hard") reviewEntry(id, 1);
   if (action === "review-score") reviewEntry(id, Number(button.dataset.score || 1));
+}
+
+function handleDelegatedChange(event) {
+  const checkbox = event.target.closest(".practice-select");
+  if (!checkbox) return;
+  const id = checkbox.dataset.id;
+  if (!id) return;
+  if (checkbox.checked) state.practiceSelection.add(id);
+  else state.practiceSelection.delete(id);
+  updatePracticeSelectionUI();
 }
 
 function readImageAsDataUrl(file) {

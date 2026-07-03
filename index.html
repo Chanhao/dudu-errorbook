@@ -6,9 +6,9 @@
     <meta name="theme-color" content="#f8fafc" />
     <title>嘟嘟错题本</title>
     <link rel="manifest" href="./manifest.json" />
-    <link rel="stylesheet" href="./styles.css?v=7" />
+    <link rel="stylesheet" href="./styles.css?v=8" />
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
-    <script src="./app.js?v=7" defer></script>
+    <script src="./app.js?v=8" defer></script>
   </head>
   <body>
     <div class="app-shell">
@@ -202,6 +202,10 @@
             <select id="typeFilter" aria-label="按类型筛选">
               <option value="">全部类型</option>
             </select>
+            <div class="selection-actions">
+              <span id="selectedPracticeCount">已勾选 0 条</span>
+              <button class="mini-button" id="clearPracticeSelectionBtn" type="button">清除勾选</button>
+            </div>
           </div>
           <div class="library-list" id="libraryList"></div>
         </section>
@@ -231,6 +235,14 @@
           <div class="generate-layout">
             <div class="panel">
               <h3>生成巩固练习</h3>
+              <label class="field">
+                <span>出题依据</span>
+                <select id="genSource">
+                  <option value="filtered">按学科和时间范围</option>
+                  <option value="selected">仅使用错题库里勾选的错题</option>
+                </select>
+              </label>
+              <p class="hint" id="genSelectionHint">需要针对某一条错题出题时，先到“错题库”勾选它，再回到这里生成。</p>
               <div class="field-grid two">
                 <label class="field">
                   <span>学科范围</span>

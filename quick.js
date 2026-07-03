@@ -22,6 +22,7 @@ const els = {
   githubBranch: $("#githubBranch"),
   githubToken: $("#githubToken"),
   editSettingsBtn: $("#editSettingsBtn"),
+  refreshPageBtn: $("#refreshPageBtn"),
   status: $("#status"),
 };
 
@@ -88,6 +89,25 @@ function startCapture() {
     return;
   }
   status("还没有检测到 Token，请粘贴后点保存设置", true);
+}
+
+async function forceRefresh() {
+  status("正在刷新页面...");
+  try {
+    if ("serviceWorker" in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map((registration) => registration.update()));
+    }
+    if ("caches" in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.filter((key) => key.startsWith("dudu-errorbook-")).map((key) => caches.delete(key)));
+    }
+  } catch {
+    // Continue with a URL refresh even when browser cache APIs are unavailable.
+  }
+  const url = new URL(window.location.href);
+  url.searchParams.set("refresh", Date.now().toString());
+  window.location.replace(url.toString());
 }
 
 function uid() {
@@ -370,6 +390,7 @@ function readImageAsDataUrl(file) {
 function bind() {
   $("#saveSettingsBtn").addEventListener("click", saveSettings);
   $("#startCaptureBtn").addEventListener("click", startCapture);
+  els.refreshPageBtn.addEventListener("click", forceRefresh);
   els.editSettingsBtn.addEventListener("click", () => {
     els.setupPanel.hidden = false;
     els.editSettingsBtn.hidden = true;

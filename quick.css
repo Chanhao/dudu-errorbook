@@ -46,6 +46,12 @@ textarea {
   margin-bottom: 18px;
 }
 
+.header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .quick-header p {
   margin: 0 0 4px;
   color: var(--accent);

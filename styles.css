@@ -460,6 +460,27 @@ textarea:focus {
   gap: 8px;
 }
 
+.practice-select-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel-soft);
+  color: var(--accent-strong);
+  font-size: 13px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.practice-select-label input {
+  width: 18px;
+  min-height: 18px;
+  accent-color: var(--accent);
+}
+
 .entry-title {
   margin: 0;
   font-size: 15px;
@@ -512,6 +533,16 @@ textarea:focus {
   display: grid;
   gap: 8px;
   margin-bottom: 12px;
+}
+
+.selection-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .search-box {
