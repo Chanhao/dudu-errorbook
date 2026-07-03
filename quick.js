@@ -20,6 +20,7 @@ const els = {
   githubRepo: $("#githubRepo"),
   githubBranch: $("#githubBranch"),
   githubToken: $("#githubToken"),
+  editSettingsBtn: $("#editSettingsBtn"),
   status: $("#status"),
 };
 
@@ -44,7 +45,10 @@ function loadSettings() {
   els.githubRepo.value = settings.repo || "dudu-errorbook-data";
   els.githubBranch.value = settings.branch || "main";
   els.githubToken.value = settings.token || "";
-  els.setupPanel.hidden = Boolean(settings.owner && settings.repo && settings.token);
+  const ready = Boolean(settings.owner && settings.repo && settings.token);
+  els.setupPanel.hidden = ready;
+  els.editSettingsBtn.hidden = !ready;
+  status(ready ? "同步设置已保存，可以开始录入" : "请先保存 GitHub Token");
 }
 
 function getSettings() {
@@ -65,7 +69,24 @@ function saveSettings() {
   }
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
   els.setupPanel.hidden = true;
-  status("设置已保存");
+  els.editSettingsBtn.hidden = false;
+  status("设置已保存，可以开始录入");
+}
+
+function startCapture() {
+  const settings = getSettings();
+  if (settings.owner && settings.repo && settings.token) {
+    saveSettings();
+    return;
+  }
+  const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}");
+  if (saved.owner && saved.repo && saved.token) {
+    els.setupPanel.hidden = true;
+    els.editSettingsBtn.hidden = false;
+    status("已使用保存的同步设置");
+    return;
+  }
+  status("还没有检测到 Token，请粘贴后点保存设置", true);
 }
 
 function uid() {
@@ -244,6 +265,12 @@ function readImageAsDataUrl(file) {
 
 function bind() {
   $("#saveSettingsBtn").addEventListener("click", saveSettings);
+  $("#startCaptureBtn").addEventListener("click", startCapture);
+  els.editSettingsBtn.addEventListener("click", () => {
+    els.setupPanel.hidden = false;
+    els.editSettingsBtn.hidden = true;
+    status("可以修改同步设置");
+  });
   $("#backBtn").addEventListener("click", resetForm);
   els.entryForm.addEventListener("submit", saveEntry);
   document.querySelectorAll("[data-mode]").forEach((button) => {

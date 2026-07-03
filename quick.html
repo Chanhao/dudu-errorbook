@@ -6,8 +6,8 @@
     <meta name="theme-color" content="#f8fafc" />
     <title>嘟嘟快速录入</title>
     <link rel="manifest" href="./manifest.json" />
-    <link rel="stylesheet" href="./quick.css?v=1" />
-    <script src="./quick.js?v=1" defer></script>
+    <link rel="stylesheet" href="./quick.css?v=2" />
+    <script src="./quick.js?v=2" defer></script>
   </head>
   <body>
     <main class="quick-shell">
@@ -37,8 +37,13 @@
           <span>GitHub Token</span>
           <input id="githubToken" type="password" autocomplete="off" placeholder="粘贴你的 GitHub Token" />
         </label>
-        <button id="saveSettingsBtn" type="button">保存设置</button>
+        <div class="setup-actions">
+          <button id="saveSettingsBtn" type="button">保存设置</button>
+          <button class="secondary-action" id="startCaptureBtn" type="button">开始录入</button>
+        </div>
       </section>
+
+      <button class="settings-toggle" id="editSettingsBtn" type="button" hidden>编辑同步设置</button>
 
       <section class="mode-grid" id="modeGrid">
         <button class="mode-card" data-mode="photo" type="button">
