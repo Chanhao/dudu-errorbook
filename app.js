@@ -304,12 +304,11 @@ function saveGitHubSettings() {
 
 function githubConfigured() {
   const settings = getGitHubSettings();
-  return Boolean(settings.owner && settings.repo && settings.path);
+  return Boolean(settings.owner && settings.repo && settings.path && settings.token);
 }
 
 function githubWritable() {
-  const settings = getGitHubSettings();
-  return Boolean(settings.owner && settings.repo && settings.path && settings.token);
+  return githubConfigured();
 }
 
 function encodeBase64(text) {
