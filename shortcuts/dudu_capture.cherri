@@ -1,0 +1,109 @@
+#include 'actions/calendar'
+#include 'actions/crypto'
+#include 'actions/images'
+#include 'actions/media'
+#include 'actions/web'
+
+#define name 嘟嘟错题录入
+#define glyph pencil
+#define color orange
+#define mac false
+#define version 18
+
+const owner = "Chanhao"
+const repo = "dudu-errorbook-data"
+const branch = "main"
+const token = "__GITHUB_TOKEN__"
+const apiBase = "https://api.github.com/repos/{owner}/{repo}"
+const dispatchURL = "{apiBase}/dispatches"
+
+menu "嘟嘟错题录入" {
+  item "手动录入":
+    @subject = prompt("学科（语文 / 数学 / 英文）", "Text", "语文")
+    @errorType = prompt("类型（错题 / 错字 / 口算 / 阅读 / 其他）", "Text", "错题")
+    @wrongText = prompt("错题/错字/错误内容", "Text", "")
+    @correctText = prompt("正确答案/修正内容（可空）", "Text", "")
+    @source = prompt("来源（作业 / 练习册 / 试卷，可空）", "Text", "作业")
+    @note = prompt("备注（可空）", "Text", "")
+    @tags = prompt("标签，逗号分隔（可空）", "Text", "")
+    const nowManual = currentDate()
+    const createdAtManual = formatTimestamp("{nowManual}", "ISO 8601", "None")
+    jsonRequest(dispatchURL, "POST", {
+      "event_type": "dudu-add-entry",
+      "client_payload": {
+        "id": "shortcut-{createdAtManual}",
+        "child": "嘟嘟",
+        "grade": "二年级",
+        "subject": "{@subject}",
+        "errorType": "{@errorType}",
+        "wrongText": "{@wrongText}",
+        "correctText": "{@correctText}",
+        "source": "{@source}",
+        "note": "{@note}",
+        "tags": "{@tags}",
+        "inputMode": "manual",
+        "imagePath": "",
+        "createdAt": "{createdAtManual}",
+        "createdBy": "shortcut"
+      }
+    }, {
+      "Accept": "application/vnd.github+json",
+      "Authorization": "Bearer {token}",
+      "X-GitHub-Api-Version": "2022-11-28"
+    })
+    nothing()
+    alert("已同步到嘟嘟错题本。", "录入完成")
+  item "拍照录入":
+    const photo = takePhoto(1, true)
+    const jpeg = convertToJPEG(photo, 70, false)
+    const encoded = base64Encode(jpeg)
+    const nowPhoto = currentDate()
+    const stamp = formatDate("{nowPhoto}", "Custom", "yyyyMMdd-HHmmss")
+    const random = randomNumber(1000, 9999)
+    const imagePath = "images/{stamp}-{random}.jpg"
+    jsonRequest("{apiBase}/contents/{imagePath}", "PUT", {
+      "message": "Add shortcut image {imagePath}",
+      "branch": "{branch}",
+      "content": "{encoded}"
+    }, {
+      "Accept": "application/vnd.github+json",
+      "Authorization": "Bearer {token}",
+      "X-GitHub-Api-Version": "2022-11-28"
+    })
+    nothing()
+    @subjectPhoto = prompt("学科（语文 / 数学 / 英文）", "Text", "语文")
+    @errorTypePhoto = prompt("类型（错题 / 错字 / 口算 / 阅读 / 其他）", "Text", "错题")
+    @wrongTextPhoto = prompt("错题/错字/错误内容", "Text", "")
+    @correctTextPhoto = prompt("正确答案/修正内容（可空）", "Text", "")
+    @sourcePhoto = prompt("来源（作业 / 练习册 / 试卷，可空）", "Text", "作业")
+    @notePhoto = prompt("备注（可空）", "Text", "")
+    @tagsPhoto = prompt("标签，逗号分隔（可空）", "Text", "")
+    const nowEntryPhoto = currentDate()
+    const createdAtPhoto = formatTimestamp("{nowEntryPhoto}", "ISO 8601", "None")
+    jsonRequest(dispatchURL, "POST", {
+      "event_type": "dudu-add-entry",
+      "client_payload": {
+        "id": "shortcut-{createdAtPhoto}",
+        "child": "嘟嘟",
+        "grade": "二年级",
+        "subject": "{@subjectPhoto}",
+        "errorType": "{@errorTypePhoto}",
+        "wrongText": "{@wrongTextPhoto}",
+        "correctText": "{@correctTextPhoto}",
+        "source": "{@sourcePhoto}",
+        "note": "{@notePhoto}",
+        "tags": "{@tagsPhoto}",
+        "inputMode": "photo",
+        "imagePath": "{imagePath}",
+        "imageMimeType": "image/jpeg",
+        "createdAt": "{createdAtPhoto}",
+        "createdBy": "shortcut"
+      }
+    }, {
+      "Accept": "application/vnd.github+json",
+      "Authorization": "Bearer {token}",
+      "X-GitHub-Api-Version": "2022-11-28"
+    })
+    nothing()
+    alert("照片和记录都已同步到嘟嘟错题本。", "录入完成")
+}
