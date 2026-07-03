@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#f8fafc" />
+    <title>嘟嘟错题本</title>
+    <link rel="manifest" href="./manifest.json" />
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+    <script src="./app.js" defer></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="导航">
+        <div class="brand">
+          <div class="brand-mark">嘟</div>
+          <div>
+            <h1>嘟嘟错题本</h1>
+            <p>一年级升二年级</p>
+          </div>
+        </div>
+        <nav class="nav-tabs" aria-label="主要视图">
+          <button class="nav-tab active" data-view="capture" type="button">
+            <i data-lucide="square-pen"></i><span>记录</span>
+          </button>
+          <button class="nav-tab" data-view="library" type="button">
+            <i data-lucide="library"></i><span>错题库</span>
+          </button>
+          <button class="nav-tab" data-view="review" type="button">
+            <i data-lucide="repeat-2"></i><span>复习</span>
+          </button>
+          <button class="nav-tab" data-view="generate" type="button">
+            <i data-lucide="sparkles"></i><span>AI 出题</span>
+          </button>
+          <button class="nav-tab" data-view="settings" type="button">
+            <i data-lucide="settings-2"></i><span>设置</span>
+          </button>
+        </nav>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">今日快速记录</p>
+            <h2 id="viewTitle">记录一个错误</h2>
+            <p class="sync-status" id="syncStatus">同步服务连接中</p>
+          </div>
+          <div class="top-actions">
+            <button class="icon-button" id="exportJsonBtn" type="button" title="导出数据">
+              <i data-lucide="download"></i>
+            </button>
+            <label class="icon-button file-button" title="导入数据">
+              <input id="importJsonInput" type="file" accept="application/json" />
+              <i data-lucide="upload"></i>
+            </label>
+          </div>
+        </header>
+
+        <section class="stats-grid" aria-label="统计">
+          <div class="stat">
+            <span>总记录</span>
+            <strong id="statTotal">0</strong>
+          </div>
+          <div class="stat">
+            <span>本周新增</span>
+            <strong id="statWeek">0</strong>
+          </div>
+          <div class="stat">
+            <span>待复习</span>
+            <strong id="statDue">0</strong>
+          </div>
+          <div class="stat">
+            <span>高频点</span>
+            <strong id="statHot">-</strong>
+          </div>
+        </section>
+
+        <section class="view active" id="captureView">
+          <form class="capture-layout" id="entryForm">
+            <input type="hidden" id="entryId" />
+            <div class="panel">
+              <div class="panel-header">
+                <h3>快速录入</h3>
+                <button class="ghost-button" id="clearFormBtn" type="button">
+                  <i data-lucide="eraser"></i><span>清空</span>
+                </button>
+              </div>
+
+              <div class="field-group">
+                <label>学科</label>
+                <div class="segmented" id="subjectGroup">
+                  <button class="selected" data-value="语文" type="button">语文</button>
+                  <button data-value="数学" type="button">数学</button>
+                  <button data-value="英文" type="button">英文</button>
+                  <button data-value="其他" type="button">其他</button>
+                </div>
+              </div>
+
+              <div class="field-grid two">
+                <label class="field">
+                  <span>错误类型</span>
+                  <select id="errorType">
+                    <option>错字/别字</option>
+                    <option>拼音/声调</option>
+                    <option>计算错误</option>
+                    <option>概念不清</option>
+                    <option>审题错误</option>
+                    <option>英语单词</option>
+                    <option>语法/句型</option>
+                    <option>阅读理解</option>
+                    <option>其他</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>来源/单元</span>
+                  <input id="source" placeholder="如：数学二单元、每日一练" />
+                </label>
+              </div>
+
+              <label class="field">
+                <span>错题、错字或原始答案</span>
+                <textarea id="wrongText" rows="4" placeholder="例如：把“已经”写成“以经”；或 36+17=43"></textarea>
+              </label>
+
+              <label class="field">
+                <span>正确答案</span>
+                <textarea id="correctText" rows="3" placeholder="例如：已经；36+17=53"></textarea>
+              </label>
+
+              <label class="field">
+                <span>原因/提醒</span>
+                <textarea id="reason" rows="3" placeholder="例如：没有进位；形近字混淆；读题太快"></textarea>
+              </label>
+
+              <div class="field-grid two">
+                <label class="field">
+                  <span>标签</span>
+                  <input id="tags" placeholder="用逗号分隔，如：进位,形近字" />
+                </label>
+                <label class="field">
+                  <span>日期</span>
+                  <input id="entryDate" type="date" />
+                </label>
+              </div>
+
+              <div class="media-row">
+                <label class="photo-picker">
+                  <input id="imageInput" type="file" accept="image/*" capture="environment" />
+                  <i data-lucide="camera"></i>
+                  <span>拍照/上传</span>
+                </label>
+                <div class="image-preview" id="imagePreview" hidden>
+                  <img id="previewImg" alt="题目图片预览" />
+                  <button class="icon-button danger" id="removeImageBtn" type="button" title="移除图片">
+                    <i data-lucide="x"></i>
+                  </button>
+                </div>
+              </div>
+
+              <div class="form-actions">
+                <button class="primary-button" type="submit">
+                  <i data-lucide="save"></i><span>保存记录</span>
+                </button>
+                <button class="secondary-button" id="aiExtractBtn" type="button">
+                  <i data-lucide="scan-text"></i><span>AI 识别照片</span>
+                </button>
+                <button class="secondary-button" id="aiClassifyBtn" type="button">
+                  <i data-lucide="wand-sparkles"></i><span>AI 补全分类</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="panel quick-panel">
+              <div class="panel-header">
+                <h3>最近记录</h3>
+                <button class="ghost-button" id="copyLastSourceBtn" type="button">
+                  <i data-lucide="copy"></i><span>沿用来源</span>
+                </button>
+              </div>
+              <div class="recent-list" id="recentList"></div>
+            </div>
+          </form>
+        </section>
+
+        <section class="view" id="libraryView">
+          <div class="toolbar panel">
+            <div class="search-box">
+              <i data-lucide="search"></i>
+              <input id="searchInput" placeholder="搜索错题、答案、原因、标签" />
+            </div>
+            <select id="subjectFilter" aria-label="按学科筛选">
+              <option value="">全部学科</option>
+              <option>语文</option>
+              <option>数学</option>
+              <option>英文</option>
+              <option>其他</option>
+            </select>
+            <select id="typeFilter" aria-label="按类型筛选">
+              <option value="">全部类型</option>
+            </select>
+          </div>
+          <div class="library-list" id="libraryList"></div>
+        </section>
+
+        <section class="view" id="reviewView">
+          <div class="review-layout">
+            <div class="panel">
+              <div class="panel-header">
+                <h3>今日复习</h3>
+              </div>
+              <div id="reviewQueue" class="review-queue"></div>
+            </div>
+            <div class="panel">
+              <div class="panel-header">
+                <h3>薄弱点</h3>
+                <button class="secondary-button" id="aiSummaryBtn" type="button">
+                  <i data-lucide="sparkles"></i><span>AI 归纳</span>
+                </button>
+              </div>
+              <div class="insight-list" id="insightList"></div>
+              <pre class="ai-output" id="summaryOutput" hidden></pre>
+            </div>
+          </div>
+        </section>
+
+        <section class="view" id="generateView">
+          <div class="generate-layout">
+            <div class="panel">
+              <h3>生成巩固练习</h3>
+              <div class="field-grid two">
+                <label class="field">
+                  <span>学科范围</span>
+                  <select id="genSubject">
+                    <option value="">全部</option>
+                    <option>语文</option>
+                    <option>数学</option>
+                    <option>英文</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>题量</span>
+                  <input id="genCount" type="number" min="3" max="30" value="10" />
+                </label>
+              </div>
+              <div class="field-grid two">
+                <label class="field">
+                  <span>时间范围</span>
+                  <select id="genRange">
+                    <option value="7">最近 7 天</option>
+                    <option value="30" selected>最近 30 天</option>
+                    <option value="90">最近 90 天</option>
+                    <option value="0">全部记录</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>练习形式</span>
+                  <select id="genMode">
+                    <option>错因变式练习</option>
+                    <option>小测验</option>
+                    <option>听写/默写清单</option>
+                    <option>口算/应用题</option>
+                    <option>英文单词与句型</option>
+                  </select>
+                </label>
+              </div>
+              <label class="field">
+                <span>额外要求</span>
+                <textarea id="genExtra" rows="3" placeholder="例如：二年级难度，题目不要太长，最后附答案和讲解"></textarea>
+              </label>
+              <button class="primary-button" id="generateBtn" type="button">
+                <i data-lucide="file-plus-2"></i><span>生成练习</span>
+              </button>
+            </div>
+            <div class="panel result-panel">
+              <div class="panel-header">
+                <h3>练习结果</h3>
+                <div class="inline-actions">
+                  <button class="icon-button" id="copyOutputBtn" type="button" title="复制">
+                    <i data-lucide="copy"></i>
+                  </button>
+                  <button class="icon-button" id="printOutputBtn" type="button" title="打印">
+                    <i data-lucide="printer"></i>
+                  </button>
+                </div>
+              </div>
+              <pre class="ai-output large" id="generateOutput">配置 API 后，可以基于错题记录生成巩固题。</pre>
+            </div>
+          </div>
+        </section>
+
+        <section class="view" id="settingsView">
+          <div class="settings-layout">
+            <div class="panel">
+              <h3>AI API 配置</h3>
+              <label class="field">
+                <span>Base URL</span>
+                <input id="apiBaseUrl" placeholder="https://api.openai.com/v1" />
+              </label>
+              <label class="field">
+                <span>API Key</span>
+                <input id="apiKey" type="password" placeholder="sk-..." autocomplete="off" />
+              </label>
+              <label class="field">
+                <span>模型名</span>
+                <input id="apiModel" placeholder="例如：gpt-4o-mini / deepseek-chat / doubao-..." />
+              </label>
+              <div class="field-grid two">
+                <label class="field">
+                  <span>温度</span>
+                  <input id="apiTemperature" type="number" min="0" max="1.5" step="0.1" value="0.4" />
+                </label>
+                <label class="field">
+                  <span>接口格式</span>
+                  <select id="apiFormat">
+                    <option value="openai">OpenAI-compatible Chat Completions</option>
+                  </select>
+                </label>
+              </div>
+              <div class="form-actions">
+                <button class="primary-button" id="saveSettingsBtn" type="button">
+                  <i data-lucide="save"></i><span>保存设置</span>
+                </button>
+                <button class="secondary-button" id="testApiBtn" type="button">
+                  <i data-lucide="plug-zap"></i><span>测试 API</span>
+                </button>
+              </div>
+              <p class="hint">API Key 仅保存在当前浏览器本地。若要给手机使用，建议在手机浏览器里单独配置一次。</p>
+            </div>
+
+            <div class="panel">
+              <h3>数据管理</h3>
+              <div class="data-actions">
+                <button class="secondary-button" id="exportMdBtn" type="button">
+                  <i data-lucide="file-text"></i><span>导出 Markdown</span>
+                </button>
+                <button class="secondary-button" id="sampleDataBtn" type="button">
+                  <i data-lucide="database"></i><span>加入示例</span>
+                </button>
+                <button class="danger-button" id="wipeDataBtn" type="button">
+                  <i data-lucide="trash-2"></i><span>清空数据</span>
+                </button>
+              </div>
+              <p class="hint">建议每周导出一次 JSON 备份。JSON 可重新导入，Markdown 适合打印或发给老师看。</p>
+            </div>
+
+            <div class="panel">
+              <h3>GitHub 远程同步</h3>
+              <div class="field-grid two">
+                <label class="field">
+                  <span>Owner</span>
+                  <input id="githubOwner" placeholder="例如：Chanhao" />
+                </label>
+                <label class="field">
+                  <span>Repo</span>
+                  <input id="githubRepo" placeholder="例如：dudu-errorbook-data" />
+                </label>
+              </div>
+              <div class="field-grid two">
+                <label class="field">
+                  <span>Branch</span>
+                  <input id="githubBranch" placeholder="main" />
+                </label>
+                <label class="field">
+                  <span>Data Path</span>
+                  <input id="githubPath" placeholder="data/entries.json" />
+                </label>
+              </div>
+              <label class="field">
+                <span>GitHub Token</span>
+                <input id="githubToken" type="password" placeholder="只保存在当前浏览器本地" autocomplete="off" />
+              </label>
+              <div class="form-actions">
+                <button class="primary-button" id="saveGitHubBtn" type="button">
+                  <i data-lucide="save"></i><span>保存 GitHub 同步</span>
+                </button>
+                <button class="secondary-button" id="testGitHubBtn" type="button">
+                  <i data-lucide="cloud-cog"></i><span>测试同步</span>
+                </button>
+              </div>
+              <p class="hint">建议把错题数据放在私有仓库。Token 只存在当前设备浏览器中，不会写进项目文件。</p>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  </body>
+</html>
