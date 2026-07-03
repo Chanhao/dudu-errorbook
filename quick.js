@@ -1,5 +1,6 @@
 const SETTINGS_KEY = "dudu-errorbook:github-sync";
 const AI_SETTINGS_KEY = "dudu-errorbook:settings";
+const SYNC_CONFIG_PREFIX = "DUDU_SYNC_CONFIG:";
 const $ = (selector) => document.querySelector(selector);
 
 const els = {
@@ -23,6 +24,8 @@ const els = {
   githubToken: $("#githubToken"),
   editSettingsBtn: $("#editSettingsBtn"),
   refreshPageBtn: $("#refreshPageBtn"),
+  copySettingsBtn: $("#copySettingsBtn"),
+  importSettingsBtn: $("#importSettingsBtn"),
   status: $("#status"),
 };
 
@@ -140,6 +143,83 @@ function decodeBase64(text) {
   const binary = atob(String(text || "").replace(/\s/g, ""));
   const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
   return new TextDecoder().decode(bytes);
+}
+
+function encodeSyncConfig(settings) {
+  return `${SYNC_CONFIG_PREFIX}${encodeBase64(
+    JSON.stringify({
+      version: 1,
+      type: "github-sync",
+      settings: {
+        owner: settings.owner || "Chanhao",
+        repo: settings.repo || "dudu-errorbook-data",
+        branch: settings.branch || "main",
+        path: settings.path || "data/entries.json",
+        token: settings.token || "",
+      },
+    }),
+  )}`;
+}
+
+function decodeSyncConfig(text) {
+  let raw = String(text || "").trim();
+  if (!raw) throw new Error("没有读取到同步配置");
+  if (raw.startsWith(SYNC_CONFIG_PREFIX)) raw = raw.slice(SYNC_CONFIG_PREFIX.length).trim();
+  const parsed = raw.startsWith("{") ? JSON.parse(raw) : JSON.parse(decodeBase64(raw));
+  const settings = parsed.settings || parsed;
+  if (!settings.owner || !settings.repo || !settings.token) {
+    throw new Error("同步配置缺少 owner、repo 或 token");
+  }
+  return {
+    owner: String(settings.owner || "Chanhao"),
+    repo: String(settings.repo || "dudu-errorbook-data"),
+    branch: String(settings.branch || "main"),
+    path: String(settings.path || "data/entries.json"),
+    token: String(settings.token || ""),
+  };
+}
+
+async function writeClipboardOrPrompt(text, label) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    window.prompt(label, text);
+  }
+}
+
+async function readClipboardOrPrompt(label) {
+  try {
+    return await navigator.clipboard.readText();
+  } catch {
+    return window.prompt(label, "") || "";
+  }
+}
+
+async function copySyncConfig() {
+  const settings = getSettings();
+  if (!settings.owner || !settings.repo || !settings.token) {
+    status("请先填写并保存同步配置", true);
+    return;
+  }
+  await writeClipboardOrPrompt(encodeSyncConfig(settings), "复制这段同步配置，然后到桌面版导入");
+  status("同步配置已复制");
+}
+
+async function importSyncConfig() {
+  try {
+    const text = await readClipboardOrPrompt("粘贴从 Safari 复制的同步配置");
+    const settings = decodeSyncConfig(text);
+    els.githubOwner.value = settings.owner;
+    els.githubRepo.value = settings.repo;
+    els.githubBranch.value = settings.branch;
+    els.githubToken.value = settings.token;
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    els.setupPanel.hidden = true;
+    els.editSettingsBtn.hidden = false;
+    status("同步配置已导入，可以开始录入");
+  } catch (error) {
+    status(error.message, true);
+  }
 }
 
 function getAiSettings() {
@@ -391,6 +471,8 @@ function bind() {
   $("#saveSettingsBtn").addEventListener("click", saveSettings);
   $("#startCaptureBtn").addEventListener("click", startCapture);
   els.refreshPageBtn.addEventListener("click", forceRefresh);
+  els.copySettingsBtn.addEventListener("click", copySyncConfig);
+  els.importSettingsBtn.addEventListener("click", importSyncConfig);
   els.editSettingsBtn.addEventListener("click", () => {
     els.setupPanel.hidden = false;
     els.editSettingsBtn.hidden = true;

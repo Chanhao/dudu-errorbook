@@ -1,6 +1,7 @@
 const STORE_KEY = "dudu-errorbook:v1";
 const SETTINGS_KEY = "dudu-errorbook:settings";
 const GITHUB_SYNC_KEY = "dudu-errorbook:github-sync";
+const SYNC_CONFIG_PREFIX = "DUDU_SYNC_CONFIG:";
 const REVIEW_INTERVALS = [0, 1, 2, 4, 7, 14, 30, 60];
 const SERVER_SYNC = location.protocol === "http:" || location.protocol === "https:";
 const AI_PROVIDERS = {
@@ -97,6 +98,8 @@ const els = {
   githubBranch: $("#githubBranch"),
   githubPath: $("#githubPath"),
   githubToken: $("#githubToken"),
+  copyGitHubConfigBtn: $("#copyGitHubConfigBtn"),
+  importGitHubConfigBtn: $("#importGitHubConfigBtn"),
   syncStatus: $("#syncStatus"),
   toast: $("#toast"),
 };
@@ -416,6 +419,83 @@ function decodeBase64(text) {
   const binary = atob(clean);
   const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
   return new TextDecoder().decode(bytes);
+}
+
+function encodeSyncConfig(settings) {
+  return `${SYNC_CONFIG_PREFIX}${encodeBase64(
+    JSON.stringify({
+      version: 1,
+      type: "github-sync",
+      settings: {
+        owner: settings.owner || "Chanhao",
+        repo: settings.repo || "dudu-errorbook-data",
+        branch: settings.branch || "main",
+        path: settings.path || "data/entries.json",
+        token: settings.token || "",
+      },
+    }),
+  )}`;
+}
+
+function decodeSyncConfig(text) {
+  let raw = String(text || "").trim();
+  if (!raw) throw new Error("没有读取到同步配置");
+  if (raw.startsWith(SYNC_CONFIG_PREFIX)) raw = raw.slice(SYNC_CONFIG_PREFIX.length).trim();
+  const parsed = raw.startsWith("{") ? JSON.parse(raw) : JSON.parse(decodeBase64(raw));
+  const settings = parsed.settings || parsed;
+  if (!settings.owner || !settings.repo || !settings.token) {
+    throw new Error("同步配置缺少 owner、repo 或 token");
+  }
+  return {
+    owner: String(settings.owner || "Chanhao"),
+    repo: String(settings.repo || "dudu-errorbook-data"),
+    branch: String(settings.branch || "main"),
+    path: String(settings.path || "data/entries.json"),
+    token: String(settings.token || ""),
+  };
+}
+
+async function writeClipboardOrPrompt(text, label) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    window.prompt(label, text);
+  }
+}
+
+async function readClipboardOrPrompt(label) {
+  try {
+    return await navigator.clipboard.readText();
+  } catch {
+    return window.prompt(label, "") || "";
+  }
+}
+
+async function copyGitHubConfig() {
+  const settings = getGitHubSettings();
+  if (!settings.owner || !settings.repo || !settings.token) {
+    toast("请先填写并保存 GitHub 同步配置");
+    return;
+  }
+  await writeClipboardOrPrompt(encodeSyncConfig(settings), "复制这段同步配置，然后到桌面版导入");
+  toast("同步配置已复制");
+}
+
+async function importGitHubConfig() {
+  try {
+    const text = await readClipboardOrPrompt("粘贴从 Safari 复制的同步配置");
+    const settings = decodeSyncConfig(text);
+    els.githubOwner.value = settings.owner;
+    els.githubRepo.value = settings.repo;
+    els.githubBranch.value = settings.branch;
+    els.githubPath.value = settings.path;
+    els.githubToken.value = settings.token;
+    localStorage.setItem(GITHUB_SYNC_KEY, JSON.stringify(settings));
+    toast("同步配置已导入，正在同步数据");
+    await syncFromServer({ initial: true, silent: false });
+  } catch (error) {
+    toast(error.message);
+  }
 }
 
 function githubFileUrl(settings) {
@@ -1223,6 +1303,8 @@ function bindEvents() {
   $("#testApiBtn").addEventListener("click", testApi);
   $("#saveGitHubBtn").addEventListener("click", saveGitHubSettings);
   $("#testGitHubBtn").addEventListener("click", testGitHubSync);
+  els.copyGitHubConfigBtn.addEventListener("click", copyGitHubConfig);
+  els.importGitHubConfigBtn.addEventListener("click", importGitHubConfig);
   $("#exportJsonBtn").addEventListener("click", exportJson);
   $("#exportMdBtn").addEventListener("click", exportMarkdown);
   $("#importJsonInput").addEventListener("change", (event) => importJson(event.target.files?.[0]));
