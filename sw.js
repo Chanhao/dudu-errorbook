@@ -1,9 +1,12 @@
-const CACHE_NAME = "dudu-errorbook-v4";
+const CACHE_NAME = "dudu-errorbook-v5";
 const ASSETS = [
   "./",
   "./index.html",
+  "./quick.html",
   "./styles.css",
+  "./quick.css",
   "./app.js",
+  "./quick.js",
   "./manifest.json",
   "./icon.svg",
 ];

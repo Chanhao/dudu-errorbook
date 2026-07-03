@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#f8fafc" />
+    <title>嘟嘟快速录入</title>
+    <link rel="manifest" href="./manifest.json" />
+    <link rel="stylesheet" href="./quick.css?v=1" />
+    <script src="./quick.js?v=1" defer></script>
+  </head>
+  <body>
+    <main class="quick-shell">
+      <header class="quick-header">
+        <div>
+          <p>嘟嘟错题本</p>
+          <h1>快速录入</h1>
+        </div>
+        <a href="./index.html">完整工具</a>
+      </header>
+
+      <section class="setup" id="setupPanel">
+        <h2>首次设置</h2>
+        <label>
+          <span>Owner</span>
+          <input id="githubOwner" value="Chanhao" />
+        </label>
+        <label>
+          <span>Repo</span>
+          <input id="githubRepo" value="dudu-errorbook-data" />
+        </label>
+        <label>
+          <span>Branch</span>
+          <input id="githubBranch" value="main" />
+        </label>
+        <label>
+          <span>GitHub Token</span>
+          <input id="githubToken" type="password" autocomplete="off" placeholder="粘贴你的 GitHub Token" />
+        </label>
+        <button id="saveSettingsBtn" type="button">保存设置</button>
+      </section>
+
+      <section class="mode-grid" id="modeGrid">
+        <button class="mode-card" data-mode="photo" type="button">
+          <strong>拍照录入</strong>
+          <span>拍作业照片，再补几项信息</span>
+        </button>
+        <button class="mode-card" data-mode="manual" type="button">
+          <strong>手动录入</strong>
+          <span>快速记录错题、错字和答案</span>
+        </button>
+      </section>
+
+      <form class="entry-form" id="entryForm" hidden>
+        <div class="form-title">
+          <h2 id="formTitle">手动录入</h2>
+          <button class="text-button" id="backBtn" type="button">返回</button>
+        </div>
+
+        <label class="photo-field" id="photoField" hidden>
+          <input id="photoInput" type="file" accept="image/*" capture="environment" />
+          <span>拍照 / 选择照片</span>
+        </label>
+        <img class="preview" id="previewImg" alt="照片预览" hidden />
+
+        <label>
+          <span>学科</span>
+          <select id="subject">
+            <option>语文</option>
+            <option>数学</option>
+            <option>英文</option>
+            <option>其他</option>
+          </select>
+        </label>
+
+        <label>
+          <span>错误类型</span>
+          <input id="errorType" placeholder="错字/别字、计算错误、图片记录" />
+        </label>
+
+        <label>
+          <span>错题、错字或备注</span>
+          <textarea id="wrongText" rows="4" placeholder="例如：36+17=43；把“已经”写成“以经”"></textarea>
+        </label>
+
+        <label>
+          <span>正确答案，可留空</span>
+          <textarea id="correctText" rows="3" placeholder="例如：36+17=53；已经"></textarea>
+        </label>
+
+        <label>
+          <span>原因/提醒，可留空</span>
+          <textarea id="reason" rows="3" placeholder="例如：忘记进位；形近字混淆"></textarea>
+        </label>
+
+        <label>
+          <span>来源/单元，可留空</span>
+          <input id="source" placeholder="例如：口算练习、语文二单元" />
+        </label>
+
+        <label>
+          <span>标签，可留空</span>
+          <input id="tags" placeholder="例如：进位,口算,形近字" />
+        </label>
+
+        <button class="save-button" id="saveEntryBtn" type="submit">保存到错题本</button>
+      </form>
+
+      <p class="status" id="status">准备就绪</p>
+    </main>
+  </body>
+</html>
