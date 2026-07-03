@@ -1,4 +1,5 @@
 const SETTINGS_KEY = "dudu-errorbook:github-sync";
+const AI_SETTINGS_KEY = "dudu-errorbook:settings";
 const $ = (selector) => document.querySelector(selector);
 
 const els = {
@@ -119,6 +120,109 @@ function decodeBase64(text) {
   const binary = atob(String(text || "").replace(/\s/g, ""));
   const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
   return new TextDecoder().decode(bytes);
+}
+
+function getAiSettings() {
+  try {
+    const settings = JSON.parse(localStorage.getItem(AI_SETTINGS_KEY) || "{}");
+    return {
+      provider: settings.provider || "openai",
+      baseUrl: String(settings.baseUrl || "").replace(/\/+$/, ""),
+      apiKey: settings.apiKey || "",
+      model: settings.model || "",
+      temperature: Number(settings.temperature || 0.4),
+    };
+  } catch {
+    return { provider: "openai", baseUrl: "", apiKey: "", model: "", temperature: 0.4 };
+  }
+}
+
+function aiConfigured() {
+  const settings = getAiSettings();
+  return Boolean(settings.baseUrl && settings.apiKey && settings.model);
+}
+
+function normalizeAiBody(settings, body) {
+  if (settings.provider === "kimi" && /^kimi-k2\./i.test(settings.model)) {
+    const temp = Number(body.temperature);
+    body.temperature = temp >= 0.9 ? 1 : 0.6;
+  }
+  return body;
+}
+
+async function callAi(messages, { json = false } = {}) {
+  const settings = getAiSettings();
+  if (!settings.baseUrl || !settings.apiKey || !settings.model) {
+    throw new Error("请先在完整工具里保存 AI API 配置");
+  }
+  const body = {
+    model: settings.model,
+    messages,
+    temperature: settings.temperature,
+  };
+  if (json) body.response_format = { type: "json_object" };
+  normalizeAiBody(settings, body);
+  const response = await fetch(`${settings.baseUrl}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${settings.apiKey}`,
+    },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`AI 调用失败：${response.status} ${text.slice(0, 160)}`);
+  }
+  const data = await response.json();
+  return data.choices?.[0]?.message?.content?.trim() || "";
+}
+
+function parseAiJson(text) {
+  const raw = String(text || "").trim();
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  return JSON.parse(fenced ? fenced[1].trim() : raw);
+}
+
+async function autoExtractPhoto() {
+  if (!state.photoDataUrl || !aiConfigured()) {
+    status("照片已准备好");
+    return;
+  }
+  status("正在自动识别照片...");
+  try {
+    const result = await callAi(
+      [
+        {
+          role: "system",
+          content:
+            "你是小学低年级作业照片识别助手。尽量从图片中提取错题或错字，判断学科、错误类型、学生写错的内容、正确答案和错因。只返回 JSON。",
+        },
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text:
+                '请识别这张作业照片。只返回 JSON：{"subject":"语文/数学/英文/其他","errorType":"","wrongText":"","correctText":"","reason":"","tags":[""]}。如果无法确定正确答案，也要尽量说明需要家长补充。',
+            },
+            { type: "image_url", image_url: { url: state.photoDataUrl } },
+          ],
+        },
+      ],
+      { json: true },
+    );
+    const parsed = parseAiJson(result);
+    if (parsed.subject) els.subject.value = parsed.subject;
+    if (parsed.errorType) els.errorType.value = parsed.errorType;
+    if (parsed.wrongText) els.wrongText.value = parsed.wrongText;
+    if (parsed.correctText) els.correctText.value = parsed.correctText;
+    if (parsed.reason) els.reason.value = parsed.reason;
+    if (Array.isArray(parsed.tags)) els.tags.value = parsed.tags.join(", ");
+    status("已自动识别，可检查后保存");
+  } catch (error) {
+    status(`自动识别失败，可手动填写：${error.message}`, true);
+  }
 }
 
 function headers(settings) {
@@ -283,7 +387,7 @@ function bind() {
     state.photoDataUrl = await readImageAsDataUrl(file);
     els.previewImg.src = state.photoDataUrl;
     els.previewImg.hidden = false;
-    status("照片已准备好");
+    await autoExtractPhoto();
   });
 }
 

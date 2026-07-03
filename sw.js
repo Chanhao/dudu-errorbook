@@ -1,4 +1,4 @@
-const CACHE_NAME = "dudu-errorbook-v7";
+const CACHE_NAME = "dudu-errorbook-v8";
 const ASSETS = [
   "./",
   "./index.html",

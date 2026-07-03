@@ -809,6 +809,11 @@ function entriesForRemote(entries) {
   return entries.map(({ resolvedImageDataUrl, ...entry }) => entry);
 }
 
+function aiConfigured() {
+  const settings = getSettings();
+  return Boolean(settings.baseUrl && settings.apiKey && settings.model);
+}
+
 function chatCompletionsUrl(settings) {
   const baseUrl = settings.baseUrl.replace(/\/+$/, "");
   return `${baseUrl}/chat/completions`;
@@ -852,6 +857,12 @@ async function callAi(messages, { json = false } = {}) {
   return data.choices?.[0]?.message?.content?.trim() || "";
 }
 
+function parseAiJson(text) {
+  const raw = String(text || "").trim();
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  return JSON.parse(fenced ? fenced[1].trim() : raw);
+}
+
 async function aiClassifyCurrent() {
   const entry = getFormEntry();
   if (!entry.wrongText && !entry.correctText && !entry.imageDataUrl) {
@@ -876,7 +887,7 @@ async function aiClassifyCurrent() {
       ],
       { json: true },
     );
-    const parsed = JSON.parse(result);
+    const parsed = parseAiJson(result);
     if (parsed.errorType) els.errorType.value = parsed.errorType;
     if (parsed.reason) els.reason.value = parsed.reason;
     if (Array.isArray(parsed.tags)) els.tags.value = parsed.tags.join(", ");
@@ -886,12 +897,16 @@ async function aiClassifyCurrent() {
   }
 }
 
-async function aiExtractFromPhoto() {
+async function aiExtractFromPhoto({ auto = false } = {}) {
   if (!state.imageDataUrl) {
-    toast("请先拍照或上传图片");
+    if (!auto) toast("请先拍照或上传图片");
     return;
   }
-  toast("正在识别照片...");
+  if (auto && !aiConfigured()) {
+    toast("照片已上传；配置 AI 后可自动识别");
+    return;
+  }
+  toast(auto ? "照片已上传，正在自动识别..." : "正在识别照片...");
   try {
     const result = await callAi(
       [
@@ -914,16 +929,16 @@ async function aiExtractFromPhoto() {
       ],
       { json: true },
     );
-    const parsed = JSON.parse(result);
+    const parsed = parseAiJson(result);
     if (parsed.subject) updateSubject(parsed.subject);
     if (parsed.errorType) els.errorType.value = parsed.errorType;
     if (parsed.wrongText) els.wrongText.value = parsed.wrongText;
     if (parsed.correctText) els.correctText.value = parsed.correctText;
     if (parsed.reason) els.reason.value = parsed.reason;
     if (Array.isArray(parsed.tags)) els.tags.value = parsed.tags.join(", ");
-    toast("照片内容已识别");
+    toast(auto ? "已自动识别，可检查后保存" : "照片内容已识别");
   } catch (error) {
-    toast(error.message);
+    toast(auto ? `自动识别失败，可手动填写：${error.message}` : error.message);
   }
 }
 
@@ -1085,6 +1100,7 @@ function bindEvents() {
     state.imageDataUrl = await readImageAsDataUrl(file);
     els.previewImg.src = state.imageDataUrl;
     els.imagePreview.hidden = false;
+    await aiExtractFromPhoto({ auto: true });
   });
   $("#removeImageBtn").addEventListener("click", () => {
     state.imageDataUrl = "";
