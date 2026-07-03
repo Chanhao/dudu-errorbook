@@ -362,7 +362,9 @@ async function githubReadEntries() {
   state.githubSha = data.sha || "";
   const text = decodeBase64(data.content || "");
   const parsed = JSON.parse(text || "[]");
-  return { entries: Array.isArray(parsed) ? parsed : parsed.entries || [], sha: state.githubSha };
+  const entries = Array.isArray(parsed) ? parsed : parsed.entries || [];
+  await hydrateGitHubImages(entries, settings);
+  return { entries, sha: state.githubSha };
 }
 
 async function githubWriteEntries(entries, { retry = true } = {}) {
@@ -370,7 +372,7 @@ async function githubWriteEntries(entries, { retry = true } = {}) {
   if (!githubWritable()) throw new Error("GitHub 写入需要填写 token。");
   const body = {
     message: `Update Dudu errorbook entries ${new Date().toISOString()}`,
-    content: encodeBase64(`${JSON.stringify(entries, null, 2)}\n`),
+    content: encodeBase64(`${JSON.stringify(entriesForRemote(entries), null, 2)}\n`),
     branch: settings.branch,
   };
   if (state.githubSha) body.sha = state.githubSha;
@@ -388,6 +390,28 @@ async function githubWriteEntries(entries, { retry = true } = {}) {
   const data = await response.json();
   state.githubSha = data.content?.sha || "";
   return entries;
+}
+
+async function hydrateGitHubImages(entries, settings) {
+  const imageEntries = entries.filter((entry) => entry.imagePath && !entry.imageDataUrl && !entry.resolvedImageDataUrl).slice(0, 80);
+  await Promise.all(
+    imageEntries.map(async (entry) => {
+      try {
+        const filePath = entry.imagePath
+          .split("/")
+          .map((part) => encodeURIComponent(part))
+          .join("/");
+        const url = `https://api.github.com/repos/${encodeURIComponent(settings.owner)}/${encodeURIComponent(settings.repo)}/contents/${filePath}?ref=${encodeURIComponent(settings.branch)}`;
+        const response = await fetch(url, { headers: githubHeaders(settings), cache: "no-store" });
+        if (!response.ok) return;
+        const data = await response.json();
+        const mime = entry.imageMimeType || "image/jpeg";
+        entry.resolvedImageDataUrl = `data:${mime};base64,${String(data.content || "").replace(/\s/g, "")}`;
+      } catch {
+        entry.resolvedImageDataUrl = "";
+      }
+    }),
+  );
 }
 
 async function syncFromGitHub({ initial = false, silent = true } = {}) {
@@ -595,7 +619,8 @@ function entryCard(entry, compact = false) {
     .filter(Boolean)
     .map((tag, index) => `<span class="tag ${index === 0 ? "subject-chip" : ""}">${escapeHtml(tag)}</span>`)
     .join("");
-  const image = entry.imageDataUrl && !compact ? `<img class="thumb" src="${entry.imageDataUrl}" alt="题目图片" />` : "";
+  const imageSrc = entryImageSrc(entry);
+  const image = imageSrc && !compact ? `<img class="thumb" src="${imageSrc}" alt="题目图片" />` : "";
   return `
     <article class="entry-card" data-id="${entry.id}">
       <header>
@@ -712,6 +737,14 @@ function compactEntries(entries) {
     原因: entry.reason,
     标签: entry.tags,
   }));
+}
+
+function entryImageSrc(entry) {
+  return entry.imageDataUrl || entry.resolvedImageDataUrl || "";
+}
+
+function entriesForRemote(entries) {
+  return entries.map(({ resolvedImageDataUrl, ...entry }) => entry);
 }
 
 async function callAi(messages, { json = false } = {}) {

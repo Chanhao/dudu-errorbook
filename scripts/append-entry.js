@@ -42,6 +42,8 @@ function normalizeEntry(payload = {}) {
     tags: normalizeTags(payload.tags),
     date,
     imageDataUrl: normalizeImage(payload),
+    imagePath: payload.imagePath || "",
+    imageMimeType: payload.imageMimeType || "",
     reviewLevel: Number(payload.reviewLevel || 0),
     nextReviewDate: payload.nextReviewDate || date,
     createdAt: payload.createdAt || now,
