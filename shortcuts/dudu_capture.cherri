@@ -31,20 +31,22 @@ menu "嘟嘟错题录入" {
     jsonRequest(dispatchURL, "POST", {
       "event_type": "dudu-add-entry",
       "client_payload": {
-        "id": "shortcut-{createdAtManual}",
-        "child": "嘟嘟",
-        "grade": "二年级",
-        "subject": "{@subject}",
-        "errorType": "{@errorType}",
-        "wrongText": "{@wrongText}",
-        "correctText": "{@correctText}",
-        "source": "{@source}",
-        "note": "{@note}",
-        "tags": "{@tags}",
-        "inputMode": "manual",
-        "imagePath": "",
-        "createdAt": "{createdAtManual}",
-        "createdBy": "shortcut"
+        "entry": {
+          "id": "shortcut-{createdAtManual}",
+          "child": "嘟嘟",
+          "grade": "二年级",
+          "subject": "{@subject}",
+          "errorType": "{@errorType}",
+          "wrongText": "{@wrongText}",
+          "correctText": "{@correctText}",
+          "source": "{@source}",
+          "note": "{@note}",
+          "tags": "{@tags}",
+          "inputMode": "manual",
+          "imagePath": "",
+          "createdAt": "{createdAtManual}",
+          "createdBy": "shortcut"
+        }
       }
     }, {
       "Accept": "application/vnd.github+json",
@@ -83,21 +85,23 @@ menu "嘟嘟错题录入" {
     jsonRequest(dispatchURL, "POST", {
       "event_type": "dudu-add-entry",
       "client_payload": {
-        "id": "shortcut-{createdAtPhoto}",
-        "child": "嘟嘟",
-        "grade": "二年级",
-        "subject": "{@subjectPhoto}",
-        "errorType": "{@errorTypePhoto}",
-        "wrongText": "{@wrongTextPhoto}",
-        "correctText": "{@correctTextPhoto}",
-        "source": "{@sourcePhoto}",
-        "note": "{@notePhoto}",
-        "tags": "{@tagsPhoto}",
-        "inputMode": "photo",
-        "imagePath": "{imagePath}",
-        "imageMimeType": "image/jpeg",
-        "createdAt": "{createdAtPhoto}",
-        "createdBy": "shortcut"
+        "entry": {
+          "id": "shortcut-{createdAtPhoto}",
+          "child": "嘟嘟",
+          "grade": "二年级",
+          "subject": "{@subjectPhoto}",
+          "errorType": "{@errorTypePhoto}",
+          "wrongText": "{@wrongTextPhoto}",
+          "correctText": "{@correctTextPhoto}",
+          "source": "{@sourcePhoto}",
+          "note": "{@notePhoto}",
+          "tags": "{@tagsPhoto}",
+          "inputMode": "photo",
+          "imagePath": "{imagePath}",
+          "imageMimeType": "image/jpeg",
+          "createdAt": "{createdAtPhoto}",
+          "createdBy": "shortcut"
+        }
       }
     }, {
       "Accept": "application/vnd.github+json",
