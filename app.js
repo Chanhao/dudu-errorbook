@@ -44,6 +44,8 @@ const state = {
   githubSha: "",
   view: "capture",
   practiceSelection: new Set(),
+  redoGenerated: false,
+  redoAnswersVisible: false,
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -72,6 +74,10 @@ const els = {
   recentList: $("#recentList"),
   libraryList: $("#libraryList"),
   reviewQueue: $("#reviewQueue"),
+  redoSelectedCount: $("#redoSelectedCount"),
+  redoSearchInput: $("#redoSearchInput"),
+  redoPickerList: $("#redoPickerList"),
+  redoOutput: $("#redoOutput"),
   insightList: $("#insightList"),
   searchInput: $("#searchInput"),
   subjectFilter: $("#subjectFilter"),
@@ -723,6 +729,7 @@ function deleteEntry(id) {
   if (!window.confirm("确认删除这条记录？")) return;
   state.entries = state.entries.filter((item) => item.id !== id);
   state.practiceSelection.delete(id);
+  if (state.redoGenerated) renderRedoOutput();
   saveEntries();
   backgroundSync(syncDeleteEntry(id));
   toast("记录已删除");
@@ -790,9 +797,9 @@ function entryCard(entry, compact = false) {
   const selected = state.practiceSelection.has(entry.id);
   const selector = compact
     ? ""
-    : `<label class="practice-select-label" title="勾选后可在 AI 出题中只针对这条错题生成练习">
+    : `<label class="practice-select-label" title="勾选后可用于原题重做或 AI 出题">
         <input class="practice-select" type="checkbox" data-id="${escapeHtml(entry.id)}" ${selected ? "checked" : ""} />
-        <span>出题</span>
+        <span>选择</span>
       </label>`;
   const tags = [entry.subject, entry.errorType, ...(entry.tags || [])]
     .filter(Boolean)
@@ -843,12 +850,15 @@ function updatePracticeSelectionUI() {
   state.practiceSelection = new Set([...state.practiceSelection].filter((id) => validIds.has(id)));
   const count = state.practiceSelection.size;
   if (els.selectedPracticeCount) els.selectedPracticeCount.textContent = `已勾选 ${count} 条`;
+  if (els.redoSelectedCount) els.redoSelectedCount.textContent = `已选 ${count} 条`;
   if (els.genSelectionHint) {
     els.genSelectionHint.textContent = count
       ? `当前已选择 ${count} 条错题。生成时会只围绕这些错题出题。`
       : "选择“某一道或几道错题”后，可在下面直接勾选要针对练习的错题。";
   }
   renderPracticePicker();
+  renderRedoPicker();
+  renderRedoOutput();
 }
 
 function entrySearchText(entry) {
@@ -882,6 +892,172 @@ function renderPracticePicker() {
         })
         .join("")
     : `<div class="empty">没有找到可选择的错题。</div>`;
+}
+
+function renderRedoPicker() {
+  if (!els.redoPickerList) return;
+  const q = els.redoSearchInput.value.trim().toLowerCase();
+  const entries = state.entries.filter((entry) => !q || entrySearchText(entry).includes(q)).slice(0, 120);
+  els.redoPickerList.innerHTML = entries.length
+    ? entries
+        .map((entry) => {
+          const title = escapeHtml(entry.wrongText || entry.correctText || "图片记录");
+          const meta = escapeHtml(`${entry.date || ""} · ${entry.subject || ""} · ${entry.errorType || ""}`);
+          const imageMark = entryImageSrc(entry) ? `<small>含图片原题</small>` : "";
+          return `
+            <label class="practice-picker-item ${state.practiceSelection.has(entry.id) ? "selected" : ""}">
+              <input class="practice-select" type="checkbox" data-id="${escapeHtml(entry.id)}" ${state.practiceSelection.has(entry.id) ? "checked" : ""} />
+              <span>
+                <strong>${title}</strong>
+                <small>${meta}</small>
+                ${imageMark}
+              </span>
+            </label>
+          `;
+        })
+        .join("")
+    : `<div class="empty">没有找到可重做的错题。</div>`;
+}
+
+function selectedRedoEntries() {
+  return state.entries.filter((entry) => state.practiceSelection.has(entry.id));
+}
+
+function redoQuestionText(entry) {
+  const wrong = String(entry.wrongText || "").trim();
+  if (!wrong) return entryImageSrc(entry) ? "请根据图片重新完成这道题。" : "请重新完成这道题。";
+  const normalizedWrong = wrong.replaceAll("＝", "=");
+  const normalizedCorrect = String(entry.correctText || "").trim().replaceAll("＝", "=");
+  const wrongEquation = normalizedWrong.match(/^(.+?)=\s*[^=]+$/);
+  if (wrongEquation) return `${wrongEquation[1].trim()} = ______`;
+  const correctEquation = normalizedCorrect.match(/^(.+?)=\s*[^=]+$/);
+  if (correctEquation && normalizedWrong.includes(correctEquation[1].trim())) {
+    return `${correctEquation[1].trim()} = ______`;
+  }
+  return wrong;
+}
+
+function redoPlainText(entries, { includeAnswers = false } = {}) {
+  const lines = ["嘟嘟原题重做", `日期：${today()}`, "", "一、题目"];
+  entries.forEach((entry, index) => {
+    lines.push(`${index + 1}. ${redoQuestionText(entry)}`);
+    if (entryImageSrc(entry)) lines.push("   图片原题：请在网页中查看或打印。");
+    lines.push("   作答：", "");
+  });
+  if (includeAnswers) {
+    lines.push("二、核对答案");
+    entries.forEach((entry, index) => {
+      lines.push(`${index + 1}. ${entry.correctText || "未填写正确答案"}`);
+      if (entry.reason) lines.push(`   提醒：${entry.reason}`);
+    });
+  }
+  return lines.join("\n");
+}
+
+function renderRedoOutput() {
+  if (!els.redoOutput) return;
+  const entries = selectedRedoEntries();
+  if (!state.redoGenerated) {
+    els.redoOutput.innerHTML = `<div class="empty">先勾选错题，再生成原题重做卷。</div>`;
+    updateRedoAnswerButton();
+    return;
+  }
+  if (!entries.length) {
+    els.redoOutput.innerHTML = `<div class="empty">还没有勾选错题。</div>`;
+    updateRedoAnswerButton();
+    return;
+  }
+  const questions = entries
+    .map((entry, index) => {
+      const imageSrc = entryImageSrc(entry);
+      const image = imageSrc ? `<img class="redo-thumb" src="${imageSrc}" alt="原题图片" />` : "";
+      return `
+        <article class="redo-question-card">
+          <div class="redo-question-head">
+            <strong>第 ${index + 1} 题</strong>
+            <span>${escapeHtml(entry.subject || "")} · ${escapeHtml(entry.errorType || "")}</span>
+          </div>
+          ${image}
+          <div class="redo-question-text">${escapeHtml(redoQuestionText(entry))}</div>
+          <div class="redo-answer-lines" aria-label="作答区">
+            <span></span>
+            <span></span>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+  const answers = state.redoAnswersVisible
+    ? `
+      <section class="redo-answer-section">
+        <h4>核对答案</h4>
+        ${entries
+          .map(
+            (entry, index) => `
+              <div class="redo-answer-card">
+                <strong>第 ${index + 1} 题</strong>
+                <div>${entry.correctText ? escapeHtml(entry.correctText) : "未填写正确答案"}</div>
+                ${entry.reason ? `<small>提醒：${escapeHtml(entry.reason)}</small>` : ""}
+              </div>
+            `,
+          )
+          .join("")}
+      </section>
+    `
+    : "";
+  els.redoOutput.innerHTML = `
+    <section class="redo-sheet">
+      <div class="redo-sheet-header">
+        <div>
+          <h4>嘟嘟原题重做</h4>
+          <span>${today()} · 共 ${entries.length} 题</span>
+        </div>
+        <span>姓名：________</span>
+      </div>
+      <div class="redo-question-list">${questions}</div>
+      ${answers}
+    </section>
+  `;
+  updateRedoAnswerButton();
+}
+
+function updateRedoAnswerButton() {
+  const button = $("#toggleRedoAnswersBtn span");
+  if (button) button.textContent = state.redoAnswersVisible ? "隐藏答案" : "显示答案";
+}
+
+function generateRedoPractice() {
+  const entries = selectedRedoEntries();
+  if (!entries.length) {
+    toast("请先勾选要重做的错题");
+    return false;
+  }
+  state.redoGenerated = true;
+  state.redoAnswersVisible = false;
+  renderRedoOutput();
+  els.redoOutput.scrollIntoView({ behavior: "smooth", block: "start" });
+  toast(`已生成 ${entries.length} 道原题`);
+  return true;
+}
+
+function toggleRedoAnswers() {
+  if (!state.redoGenerated && !generateRedoPractice()) return;
+  state.redoAnswersVisible = !state.redoAnswersVisible;
+  renderRedoOutput();
+}
+
+async function copyRedoPractice() {
+  if (!state.redoGenerated && !generateRedoPractice()) return;
+  const entries = selectedRedoEntries();
+  await writeClipboardOrPrompt(redoPlainText(entries, { includeAnswers: state.redoAnswersVisible }), "复制这份原题重做卷");
+  toast("原题重做卷已复制");
+}
+
+function printRedoPractice() {
+  if (!state.redoGenerated && !generateRedoPractice()) return;
+  document.body.classList.add("print-redo");
+  window.print();
+  window.setTimeout(() => document.body.classList.remove("print-redo"), 800);
 }
 
 function renderReview() {
@@ -1284,18 +1460,30 @@ function bindEvents() {
   $("#aiClassifyBtn").addEventListener("click", aiClassifyCurrent);
   $("#aiSummaryBtn").addEventListener("click", aiSummary);
   $("#generateBtn").addEventListener("click", generatePractice);
+  $("#generateRedoBtn").addEventListener("click", generateRedoPractice);
+  $("#toggleRedoAnswersBtn").addEventListener("click", toggleRedoAnswers);
+  $("#copyRedoBtn").addEventListener("click", copyRedoPractice);
+  $("#printRedoBtn").addEventListener("click", printRedoPractice);
   els.genSource.addEventListener("change", () => {
     updatePracticeSelectionUI();
     renderPracticePicker();
   });
   els.practiceSearchInput.addEventListener("input", renderPracticePicker);
+  els.redoSearchInput.addEventListener("input", renderRedoPicker);
   els.clearPracticeSelectionBtn.addEventListener("click", () => {
     state.practiceSelection.clear();
+    state.redoGenerated = false;
     renderLibrary();
     updatePracticeSelectionUI();
   });
   els.clearGeneratePracticeSelectionBtn.addEventListener("click", () => {
     state.practiceSelection.clear();
+    state.redoGenerated = false;
+    updatePracticeSelectionUI();
+  });
+  $("#clearRedoSelectionBtn").addEventListener("click", () => {
+    state.practiceSelection.clear();
+    state.redoGenerated = false;
     updatePracticeSelectionUI();
   });
   els.apiProvider.addEventListener("change", () => applyProviderPreset({ force: true }));
